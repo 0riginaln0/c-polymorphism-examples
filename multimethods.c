@@ -37,6 +37,9 @@
 // #ifndef MULTIMETHODS_H
 // #define MULTIMETHODS_H
 
+#include <stdlib.h>
+#include <string.h>
+
 // Function pointer type for method implementations.
 // Takes a void* argument that can be cast to a user‑defined struct.
 typedef void* (*Multimethod_Fn)(void*);
@@ -187,8 +190,6 @@ void multimethod_cleanup(void) {
 // #endif
 
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
 typedef struct { double side; } Square;
 typedef struct { double width, length; } Rectangle;
