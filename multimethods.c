@@ -17,9 +17,9 @@
  * (defmethod area :circle [{:keys [radius]}] (* 3.14 radius radius))
  * (defmethod perimeter :circle [{:keys [radius]}] (* 2 3.14 radius))
  *
- * (def square   {:type :square, :center-x 0.0, :center-y 0.0, :side 5.0})
- * (def rectangle {:type :rectangle, :center-x 2.0, :center-y 3.0, :width 4.0, :length 6.0})
- * (def circle    {:type :circle, :center-x 1.0, :center-y 1.0, :radius 3.0})
+ * (def square    {:type :square    :side 5.0})
+ * (def rectangle {:type :rectangle :width 4.0 :length 6.0})
+ * (def circle    {:type :circle    :radius 3.0})
  *
  * (defn -main []
  *   (doseq [shape [square rectangle circle]]
