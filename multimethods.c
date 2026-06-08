@@ -2,6 +2,38 @@
 // MULTIMETHODS /////////////////////
 /////////////////////////////////////
 
+/*
+ * ;; Clojure version
+ *
+ * (defmulti area :type)
+ * (defmulti perimeter :type)
+ *
+ * (defmethod area :square [{:keys [side]}] (* side side))
+ * (defmethod perimeter :square [{:keys [side]}] (* side 4))
+ *
+ * (defmethod area :rectangle [{:keys [width length]}] (* width length))
+ * (defmethod perimeter :rectangle [{:keys [width length]}] (* 2 (+ width length)))
+ *
+ * (defmethod area :circle [{:keys [radius]}] (* 3.14 radius radius))
+ * (defmethod perimeter :circle [{:keys [radius]}] (* 2 3.14 radius))
+ *
+ * (def square   {:type :square, :center-x 0.0, :center-y 0.0, :side 5.0})
+ * (def rectangle {:type :rectangle, :center-x 2.0, :center-y 3.0, :width 4.0, :length 6.0})
+ * (def circle    {:type :circle, :center-x 1.0, :center-y 1.0, :radius 3.0})
+ *
+ * (defn -main []
+ *   (doseq [shape [square rectangle circle]]
+ *     (println (format "Shape area: %.2f, perimeter: %.2f"
+ *                      (area shape) (perimeter shape))))
+ *
+ *   (let [shapes [square rectangle circle]]
+ *     (doseq [[idx shape] (map-indexed vector shapes)]
+ *       (println (format "Shape %d area: %.2f, perimeter: %.2f"
+ *                        (inc idx) (area shape) (perimeter shape))))))
+ *
+ * (-main)
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -194,11 +226,11 @@ int main(void) {
     create_multimethod("area");
     create_multimethod("perimeter");
 
-    add_method("area", "square", square_area);
+    add_method("area",      "square", square_area);
     add_method("perimeter", "square", square_perimeter);
-    add_method("area", "rectangle", rectangle_area);
+    add_method("area",      "rectangle", rectangle_area);
     add_method("perimeter", "rectangle", rectangle_perimeter);
-    add_method("area", "circle", circle_area);
+    add_method("area",      "circle", circle_area);
     add_method("perimeter", "circle", circle_perimeter);
 
     Square sq = {.side = 5.0};
