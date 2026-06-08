@@ -34,6 +34,9 @@
  * (-main)
  */
 
+// #ifndef MULTIMETHODS_H
+// #define MULTIMETHODS_H
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -71,6 +74,8 @@ typedef struct Multimethod {
     Method_Entry* methods;
     struct Multimethod* next;
 } Multimethod;
+
+// #ifdef MULTIMETHODS_IMPLEMENTATION
 
 static Multimethod* multimethods_head = NULL;
 
@@ -181,6 +186,13 @@ void multimethod_cleanup(void) {
 
     multimethods_head = NULL;
 }
+
+// #endif
+// #endif
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 typedef struct { double side; } Square;
 typedef struct { double width, length; } Rectangle;
