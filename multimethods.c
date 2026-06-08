@@ -40,7 +40,7 @@
 
 // Function pointer type for method implementations.
 // Takes a void* argument that can be cast to a user‑defined struct.
-typedef void* (*multimethod_fn)(void*);
+typedef void* (*Multimethod_Fn)(void*);
 
 // Create a new multimethod with the given name.
 // Returns 0 on success, -1 if a multimethod with that name already exists or on allocation error.
@@ -50,7 +50,7 @@ int create_multimethod(const char* name);
 // dispatch_value: string key used for dispatch (e.g. "square", "circle").
 // fn: function pointer to the method implementation.
 // Returns 0 on success, -1 if the multimethod doesn't exist or the key already exists.
-int add_method(const char* multimethod_name, const char* dispatch_value, multimethod_fn fn);
+int add_method(const char* multimethod_name, const char* dispatch_value, Multimethod_Fn fn);
 
 // Call the multimethod: lookup the function for the given dispatch_value,
 // and invoke it with the provided argument.
@@ -60,15 +60,15 @@ void* call_multimethod(const char* multimethod_name, const char* dispatch_value,
 // Clean up all allocated memory.
 void multimethod_cleanup(void);
 
-typedef struct MethodEntry {
+typedef struct Method_Entry {
     char* dispatch_value;
-    multimethod_fn fn;
-    struct MethodEntry* next;
-} MethodEntry;
+    Multimethod_Fn fn;
+    struct Method_Entry* next;
+} Method_Entry;
 
 typedef struct Multimethod {
     char* name;
-    MethodEntry* methods;
+    Method_Entry* methods;
     struct Multimethod* next;
 } Multimethod;
 
@@ -85,8 +85,8 @@ static Multimethod* find_multimethod(const char* name) {
     return NULL;
 }
 
-static MethodEntry* find_method(Multimethod* mm, const char* dispatch_value) {
-    MethodEntry* cur = mm->methods;
+static Method_Entry* find_method(Multimethod* mm, const char* dispatch_value) {
+    Method_Entry* cur = mm->methods;
     while (cur) {
         if (strcmp(cur->dispatch_value, dispatch_value) == 0) {
             return cur;
@@ -118,7 +118,7 @@ int create_multimethod(const char* name) {
     return 0;
 }
 
-int add_method(const char* multimethod_name, const char* dispatch_value, multimethod_fn fn) {
+int add_method(const char* multimethod_name, const char* dispatch_value, Multimethod_Fn fn) {
     Multimethod* mm = find_multimethod(multimethod_name);
     if (mm == NULL) {
         return -1;
@@ -128,7 +128,7 @@ int add_method(const char* multimethod_name, const char* dispatch_value, multime
         return -1;
     }
 
-    MethodEntry* new_entry = (MethodEntry*)malloc(sizeof(MethodEntry));
+    Method_Entry* new_entry = (Method_Entry*)malloc(sizeof(Method_Entry));
     if (new_entry == NULL) {
         return -1;
     }
@@ -152,7 +152,7 @@ void* call_multimethod(const char* multimethod_name, const char* dispatch_value,
         return NULL;
     }
 
-    MethodEntry* entry = find_method(mm, dispatch_value);
+    Method_Entry* entry = find_method(mm, dispatch_value);
     if (entry == NULL) {
         return NULL;
     }
@@ -166,9 +166,9 @@ void multimethod_cleanup(void) {
     while (cur_mm) {
         Multimethod* next_mm = cur_mm->next;
 
-        MethodEntry* cur_me = cur_mm->methods;
+        Method_Entry* cur_me = cur_mm->methods;
         while (cur_me) {
-            MethodEntry* next_me = cur_me->next;
+            Method_Entry* next_me = cur_me->next;
             free(cur_me->dispatch_value);
             free(cur_me);
             cur_me = next_me;
@@ -226,12 +226,12 @@ int main(void) {
     create_multimethod("area");
     create_multimethod("perimeter");
 
-    add_method("area",      "square", square_area);
-    add_method("perimeter", "square", square_perimeter);
+    add_method("area",      "square",    square_area);
+    add_method("perimeter", "square",    square_perimeter);
     add_method("area",      "rectangle", rectangle_area);
     add_method("perimeter", "rectangle", rectangle_perimeter);
-    add_method("area",      "circle", circle_area);
-    add_method("perimeter", "circle", circle_perimeter);
+    add_method("area",      "circle",    circle_area);
+    add_method("perimeter", "circle",    circle_perimeter);
 
     Square sq = {.side = 5.0};
     Rectangle rc = {.width = 4.0, .length = 6.0};
