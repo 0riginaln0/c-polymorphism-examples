@@ -108,6 +108,7 @@ int create_multimethod(const char* name) {
 
     new_mm->name = strdup(name);
     if (new_mm->name == NULL) {
+        free(new_mm);
         return -1;
     }
 
