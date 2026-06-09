@@ -9,6 +9,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include <stdint.h>
+
+#define MULTIMETHODS_HASH_CAPACITY 32
+#define METHODS_HASH_CAPACITY 16
 
 typedef void (*Multimethod_Fn)(void* args, void* out);
 
@@ -20,13 +24,11 @@ void multimethod_cleanup(void);
 typedef struct Method_Entry {
     char* dispatch_value;
     Multimethod_Fn fn;
-    struct Method_Entry* next;
 } Method_Entry;
 
 typedef struct Multimethod {
     char* name;
-    Method_Entry* methods;
-    struct Multimethod* next;
+    Method_Entry methods[METHODS_HASH_CAPACITY];
 } Multimethod;
 
 // #ifdef MULTIMETHODS_IMPLEMENTATION
@@ -48,23 +50,48 @@ static char* my_strdup(char const * const src) {
     return dst;
 }
 
-static Multimethod* multimethods_head = NULL;
+static uint32_t hash_djb2(char const * str, uint32_t capacity) {
+    uint32_t hash = 5381;
+    unsigned char const * u_str = (unsigned char const *)str;
+    int c;
+    while (true) {
+        c = *u_str;
+        if (c == 0) break;
+        u_str += 1;
+        hash = ((hash << 5) + hash) + (uint32_t)c;
+    }
+    return hash % capacity;
+}
+
+static Multimethod multimethods_table[MULTIMETHODS_HASH_CAPACITY] = {0};
 
 static Multimethod* find_multimethod(char const * const name) {
-    Multimethod* cur = multimethods_head;
-    while (cur) {
-        if (strcmp(cur->name, name) == 0) return cur;
-        cur = cur->next;
+    uint32_t index = hash_djb2(name, MULTIMETHODS_HASH_CAPACITY);
+    uint32_t start_index = index;
+
+    while (multimethods_table[index].name != NULL) {
+        if (strcmp(multimethods_table[index].name, name) == 0) {
+            return &multimethods_table[index];
+        }
+        index = (index + 1) % MULTIMETHODS_HASH_CAPACITY;
+        if (index == start_index) break;
     }
+
     return NULL;
 }
 
 static Method_Entry* find_method(Multimethod * const mm, char const * const dispatch_value) {
-    Method_Entry* cur = mm->methods;
-    while (cur) {
-        if (strcmp(cur->dispatch_value, dispatch_value) == 0) return cur;
-        cur = cur->next;
+    uint32_t index = hash_djb2(dispatch_value, METHODS_HASH_CAPACITY);
+    uint32_t start_index = index;
+
+    while (mm->methods[index].dispatch_value != NULL) {
+        if (strcmp(mm->methods[index].dispatch_value, dispatch_value) == 0) {
+            return &mm->methods[index];
+        }
+        index = (index + 1) % METHODS_HASH_CAPACITY;
+        if (index == start_index) break;
     }
+
     return NULL;
 }
 
@@ -73,43 +100,41 @@ bool defmulti(char const * const name) {
 
     if (find_multimethod(name)) return false;
 
-    Multimethod* new_mm = malloc(sizeof(*new_mm));
-    if (new_mm == NULL) return false;
+    uint32_t index = hash_djb2(name, MULTIMETHODS_HASH_CAPACITY);
+    uint32_t start_index = index;
 
-    new_mm->name = my_strdup(name);
-    if (new_mm->name == NULL) {
-        free(new_mm);
-        return false;
+    while (multimethods_table[index].name != NULL) {
+        index = (index + 1) % MULTIMETHODS_HASH_CAPACITY;
+        if (index == start_index) return false;
     }
 
-    new_mm->methods = NULL;
-    new_mm->next = multimethods_head;
-    multimethods_head = new_mm;
+    multimethods_table[index].name = my_strdup(name);
+    if (multimethods_table[index].name == NULL) return false;
 
+    memset(multimethods_table[index].methods, 0, sizeof(multimethods_table[index].methods));
     return true;
 }
 
 bool defmethod(char const * const multimethod_name, char const * const dispatch_value, Multimethod_Fn fn) {
-	if (any_is_null(multimethod_name, dispatch_value, fn)) return false;
+    if (any_is_null(multimethod_name, dispatch_value, fn)) return false;
 
-	Multimethod* mm = find_multimethod(multimethod_name);
-	if (mm == NULL) return false;
+    Multimethod* mm = find_multimethod(multimethod_name);
+    if (mm == NULL) return false;
 
-	if (find_method(mm, dispatch_value)) return false;
+    if (find_method(mm, dispatch_value)) return false;
 
-	Method_Entry* new_entry = malloc(sizeof(*new_entry));
-	if (new_entry == NULL) return false;
+    uint32_t index = hash_djb2(dispatch_value, METHODS_HASH_CAPACITY);
+    uint32_t start_index = index;
 
-	new_entry->dispatch_value = my_strdup(dispatch_value);
-	if (new_entry->dispatch_value == NULL) {
-		free(new_entry);
-		return false;
-	}
+    while (mm->methods[index].dispatch_value != NULL) {
+        index = (index + 1) % METHODS_HASH_CAPACITY;
+        if (index == start_index) return false;
+    }
 
-    new_entry->fn = fn;
-    new_entry->next = mm->methods;
-    mm->methods = new_entry;
+    mm->methods[index].dispatch_value = my_strdup(dispatch_value);
+    if (mm->methods[index].dispatch_value == NULL) return false;
 
+    mm->methods[index].fn = fn;
     return true;
 }
 
@@ -123,29 +148,21 @@ bool dispatch(char const * const multimethod_name, char const * const dispatch_v
     if (entry == NULL) return false;
 
     entry->fn(arg, out);
-
     return true;
 }
 
 void multimethod_cleanup(void) {
-    Multimethod* cur_mm = multimethods_head;
+    for (size_t i = 0; i < MULTIMETHODS_HASH_CAPACITY; i++) {
+        if (multimethods_table[i].name == NULL) continue;
+        free(multimethods_table[i].name);
+        multimethods_table[i].name = NULL;
 
-    while (cur_mm) {
-        Multimethod* next_mm = cur_mm->next;
-
-        Method_Entry* cur_me = cur_mm->methods;
-        while (cur_me) {
-            Method_Entry* next_me = cur_me->next;
-            free(cur_me->dispatch_value);
-            free(cur_me);
-            cur_me = next_me;
+        for (size_t j = 0; j < METHODS_HASH_CAPACITY; j++) {
+            if (multimethods_table[i].methods[j].dispatch_value == NULL) continue;
+            free(multimethods_table[i].methods[j].dispatch_value);
+            multimethods_table[i].methods[j].dispatch_value = NULL;
         }
-        free(cur_mm->name);
-        free(cur_mm);
-        cur_mm = next_mm;
     }
-
-    multimethods_head = NULL;
 }
 
 #undef IS_NULL
