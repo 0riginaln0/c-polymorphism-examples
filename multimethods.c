@@ -1,3 +1,4 @@
+// gcc -std=c99 -Wall -Wextra -Wpedantic -pedantic-errors -Werror -Wconversion multi.c -o multi.exe && ./multi.exe
 /////////////////////////////////////
 // MULTIMETHODS /////////////////////
 /////////////////////////////////////
@@ -7,26 +8,13 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include <stddef.h>
+#include <stdbool.h>
 
-static char* my_strdup(const char* src) {
-    if (src == NULL) return NULL;
-    size_t len = strlen(src) + 1;
-    char* dst = (char*)malloc(len);
-    if (dst) {
-        memcpy(dst, src, len);
-    }
-    return dst;
-}
+typedef void (*Multimethod_Fn)(void* args, void* out);
 
-typedef void* (*Multimethod_Fn)(void*);
-
-int create_multimethod(const char* name);
-
-int add_method(const char* multimethod_name, const char* dispatch_value, Multimethod_Fn fn);
-
-void* call_multimethod(const char* multimethod_name, const char* dispatch_value, void* arg);
-
+bool defmulti(char const * const name);
+bool defmethod(char const * const multimethod_name, char const * const dispatch_value, Multimethod_Fn fn);
+bool dispatch(char const * const multimethod_name, char const * const dispatch_value, void* args, void* out);
 void multimethod_cleanup(void);
 
 typedef struct Method_Entry {
@@ -43,105 +31,100 @@ typedef struct Multimethod {
 
 // #ifdef MULTIMETHODS_IMPLEMENTATION
 
+#define IS_NULL(x) ((x) == NULL)
+#define ANY_NULL_1(a)           (IS_NULL(a))
+#define ANY_NULL_2(a, b)        (IS_NULL(a) || IS_NULL(b))
+#define ANY_NULL_3(a, b, c)     (IS_NULL(a) || IS_NULL(b) || IS_NULL(c))
+#define ANY_NULL_4(a, b, c, d)  (IS_NULL(a) || IS_NULL(b) || IS_NULL(c) || IS_NULL(d))
+
+#define GET_ANY_NULL_MACRO(_1, _2, _3, _4, NAME, ...) NAME
+#define any_is_null(...) GET_ANY_NULL_MACRO(__VA_ARGS__, ANY_NULL_4, ANY_NULL_3, ANY_NULL_2, ANY_NULL_1)(__VA_ARGS__)
+
+static char* my_strdup(char const * const src) {
+    if (src == NULL) return NULL;
+    size_t len = strlen(src) + 1;
+    char* dst = malloc(len);
+    if (dst) memcpy(dst, src, len);
+    return dst;
+}
+
 static Multimethod* multimethods_head = NULL;
 
-static Multimethod* find_multimethod(const char* name) {
+static Multimethod* find_multimethod(char const * const name) {
     Multimethod* cur = multimethods_head;
     while (cur) {
-        if (strcmp(cur->name, name) == 0) {
-            return cur;
-        }
+        if (strcmp(cur->name, name) == 0) return cur;
         cur = cur->next;
     }
     return NULL;
 }
 
-static Method_Entry* find_method(Multimethod* mm, const char* dispatch_value) {
+static Method_Entry* find_method(Multimethod * const mm, char const * const dispatch_value) {
     Method_Entry* cur = mm->methods;
     while (cur) {
-        if (strcmp(cur->dispatch_value, dispatch_value) == 0) {
-            return cur;
-        }
+        if (strcmp(cur->dispatch_value, dispatch_value) == 0) return cur;
         cur = cur->next;
     }
     return NULL;
 }
 
-int create_multimethod(const char* name) {
-    if (name == NULL) {
-        return -1;
-    }
-    
-    if (find_multimethod(name) != NULL) {
-        return -1;
-    }
+bool defmulti(char const * const name) {
+    if (name == NULL) return false;
 
-    Multimethod* new_mm = (Multimethod*)malloc(sizeof(Multimethod));
-    if (new_mm == NULL) {
-        return -1;
-    }
+    if (find_multimethod(name)) return false;
+
+    Multimethod* new_mm = malloc(sizeof(*new_mm));
+    if (new_mm == NULL) return false;
 
     new_mm->name = my_strdup(name);
     if (new_mm->name == NULL) {
         free(new_mm);
-        return -1;
+        return false;
     }
 
     new_mm->methods = NULL;
     new_mm->next = multimethods_head;
     multimethods_head = new_mm;
 
-    return 0;
+    return true;
 }
 
-int add_method(const char* multimethod_name, const char* dispatch_value, Multimethod_Fn fn) {
-    if (multimethod_name == NULL || dispatch_value == NULL) {
-        return -1;
-    }
+bool defmethod(char const * const multimethod_name, char const * const dispatch_value, Multimethod_Fn fn) {
+	if (any_is_null(multimethod_name, dispatch_value, fn)) return false;
 
-    Multimethod* mm = find_multimethod(multimethod_name);
-    if (mm == NULL) {
-        return -1;
-    }
+	Multimethod* mm = find_multimethod(multimethod_name);
+	if (mm == NULL) return false;
 
-    if (find_method(mm, dispatch_value) != NULL) {
-        return -1;
-    }
+	if (find_method(mm, dispatch_value)) return false;
 
-    Method_Entry* new_entry = (Method_Entry*)malloc(sizeof(Method_Entry));
-    if (new_entry == NULL) {
-        return -1;
-    }
+	Method_Entry* new_entry = malloc(sizeof(*new_entry));
+	if (new_entry == NULL) return false;
 
-    new_entry->dispatch_value = my_strdup(dispatch_value);
-    if (new_entry->dispatch_value == NULL) {
-        free(new_entry);
-        return -1;
-    }
+	new_entry->dispatch_value = my_strdup(dispatch_value);
+	if (new_entry->dispatch_value == NULL) {
+		free(new_entry);
+		return false;
+	}
 
     new_entry->fn = fn;
     new_entry->next = mm->methods;
     mm->methods = new_entry;
 
-    return 0;
+    return true;
 }
 
-void* call_multimethod(const char* multimethod_name, const char* dispatch_value, void* arg) {
-    if (multimethod_name == NULL || dispatch_value == NULL) {
-        return NULL;
-    }
+bool dispatch(char const * const multimethod_name, char const * const dispatch_value, void* arg, void* out) {
+    if (any_is_null(multimethod_name, dispatch_value)) return false;
 
     Multimethod* mm = find_multimethod(multimethod_name);
-    if (mm == NULL) {
-        return NULL;
-    }
+    if (mm == NULL) return false;
 
     Method_Entry* entry = find_method(mm, dispatch_value);
-    if (entry == NULL) {
-        return NULL;
-    }
+    if (entry == NULL) return false;
 
-    return entry->fn(arg);
+    entry->fn(arg, out);
+
+    return true;
 }
 
 void multimethod_cleanup(void) {
@@ -165,6 +148,14 @@ void multimethod_cleanup(void) {
     multimethods_head = NULL;
 }
 
+#undef IS_NULL
+#undef ANY_NULL_1
+#undef ANY_NULL_2
+#undef ANY_NULL_3
+#undef ANY_NULL_4
+#undef GET_ANY_NULL_MACRO
+#undef any_is_null
+
 // #endif
 // #endif
 
@@ -174,135 +165,108 @@ typedef struct { double side; } Square;
 typedef struct { double width, length; } Rectangle;
 typedef struct { double radius; } Circle;
 
-void* square_area(void* args) {
+void square_area(void* args, void* out) {
     Square* s = (Square*)args;
-    double* result = (double*)malloc(sizeof(double));
-    if (result == NULL) return NULL;
-    *result = s->side * s->side;
-    return result;
+    *(double*)out = s->side * s->side;
 }
 
-void* square_perimeter(void* args) {
+void square_perimeter(void* args, void* out) {
     Square* s = (Square*)args;
-    double* result = (double*)malloc(sizeof(double));
-    if (result == NULL) return NULL;
-    *result = s->side * 4;
-    return result;
+    *(double*)out = s->side * 4.0;
 }
 
-void* rectangle_area(void* args) {
+void rectangle_area(void* args, void* out) {
     Rectangle* r = (Rectangle*)args;
-    double* result = (double*)malloc(sizeof(double));
-    if (result == NULL) return NULL;
-    *result = r->width * r->length;
-    return result;
+    *(double*)out = r->width * r->length;
 }
 
-void* rectangle_perimeter(void* args) {
+void rectangle_perimeter(void* args, void* out) {
     Rectangle* r = (Rectangle*)args;
-    double* result = (double*)malloc(sizeof(double));
-    if (result == NULL) return NULL;
-    *result = 2 * (r->width + r->length);
-    return result;
+    *(double*)out = 2.0 * (r->width + r->length);
 }
 
-void* circle_area(void* args) {
+void circle_area(void* args, void* out) {
     Circle* c = (Circle*)args;
-    double* result = (double*)malloc(sizeof(double));
-    if (result == NULL) return NULL;
-    *result = 3.14 * c->radius * c->radius;
-    return result;
+    *(double*)out = 3.14 * c->radius * c->radius;
 }
 
-void* circle_perimeter(void* args) {
+void circle_perimeter(void* args, void* out) {
     Circle* c = (Circle*)args;
-    double* result = (double*)malloc(sizeof(double));
-    if (result == NULL) return NULL;
-    *result = 2 * 3.14 * c->radius;
-    return result;
+    *(double*)out = 2.0 * 3.14 * c->radius;
 }
 
 int main(void) {
-    if (create_multimethod("area") != 0) {
+    if (!defmulti("area")) {
         fprintf(stderr, "Failed to create multimethod 'area'\n");
         return 1;
     }
-    if (create_multimethod("perimeter") != 0) {
+    if (!defmulti("perimeter")) {
         fprintf(stderr, "Failed to create multimethod 'perimeter'\n");
-        multimethod_cleanup();
-        return 1;
+        goto error_cleanup;
     }
 
-    if (add_method("area",      "square",    square_area) != 0 ||
-        add_method("perimeter", "square",    square_perimeter) != 0 ||
-        add_method("area",      "rectangle", rectangle_area) != 0 ||
-        add_method("perimeter", "rectangle", rectangle_perimeter) != 0 ||
-        add_method("area",      "circle",    circle_area) != 0 ||
-        add_method("perimeter", "circle",    circle_perimeter) != 0) {
+    if (!defmethod("area",      "square",    square_area)         ||
+        !defmethod("perimeter", "square",    square_perimeter)    ||
+        !defmethod("area",      "rectangle", rectangle_area)      ||
+        !defmethod("perimeter", "rectangle", rectangle_perimeter) ||
+        !defmethod("area",      "circle",    circle_area)         ||
+        !defmethod("perimeter", "circle",    circle_perimeter)) {
         fprintf(stderr, "Failed to add one or more methods\n");
-        multimethod_cleanup();
-        return 1;
+        goto error_cleanup;
     }
 
     Square sq = {.side = 5.0};
     Rectangle rc = {.width = 4.0, .length = 6.0};
     Circle ci = {.radius = 3.0};
-    
-    double* area_sq = (double*)call_multimethod("area", "square", &sq);
-    double* perim_sq = (double*)call_multimethod("perimeter", "square", &sq);
-    if (area_sq == NULL || perim_sq == NULL) {
+
+    double area;
+    double perim;
+    bool ok = true;
+    ok &= dispatch("area", "square", &sq, &area);
+    ok &= dispatch("perimeter", "square", &sq, &perim);
+    if (!ok) {
         fprintf(stderr, "Error calling multimethod for square\n");
-        free(area_sq); free(perim_sq);
-        multimethod_cleanup();
-        return 1;
+        goto error_cleanup;
     }
-    printf("Square area: %.2f, perimeter: %.2f\n", *area_sq, *perim_sq);
-    free(area_sq); free(perim_sq);
+    printf("Square area: %.2f, perimeter: %.2f\n", area, perim);
 
-    double* area_rc = (double*)call_multimethod("area", "rectangle", &rc);
-    double* perim_rc = (double*)call_multimethod("perimeter", "rectangle", &rc);
-    if (area_rc == NULL || perim_rc == NULL) {
+    ok &= dispatch("area", "rectangle", &rc, &area);
+    ok &= dispatch("perimeter", "rectangle", &rc, &perim);
+    if (!ok) {
         fprintf(stderr, "Error calling multimethod for rectangle\n");
-        free(area_rc); free(perim_rc);
-        multimethod_cleanup();
-        return 1;
+        goto error_cleanup;
     }
-    printf("Rectangle area: %.2f, perimeter: %.2f\n", *area_rc, *perim_rc);
-    free(area_rc); free(perim_rc);
+    printf("Rectangle area: %.2f, perimeter: %.2f\n", area, perim);
 
-    double* area_ci = (double*)call_multimethod("area", "circle", &ci);
-    double* perim_ci = (double*)call_multimethod("perimeter", "circle", &ci);
-    if (area_ci == NULL || perim_ci == NULL) {
+    ok &= dispatch("area", "circle", &ci, &area);
+    ok &= dispatch("perimeter", "circle", &ci, &perim);
+    if (!ok) {
         fprintf(stderr, "Error calling multimethod for circle\n");
-        free(area_ci); free(perim_ci);
-        multimethod_cleanup();
-        return 1;
+        goto error_cleanup;
     }
-    printf("Circle area: %.2f, perimeter: %.2f\n", *area_ci, *perim_ci);
-    free(area_ci); free(perim_ci);
+    printf("Circle area: %.2f, perimeter: %.2f\n", area, perim);
     
     struct { const char* type; void* data; } shapes[] = {
         {"square", &sq},
         {"rectangle", &rc},
         {"circle", &ci}
     };
-    int num_shapes = sizeof(shapes) / sizeof(shapes[0]);
+    size_t num_shapes = sizeof(shapes) / sizeof(shapes[0]);
 
-    for (int i = 0; i < num_shapes; i++) {
-        double* area = (double*)call_multimethod("area", shapes[i].type, shapes[i].data);
-        double* perimeter = (double*)call_multimethod("perimeter", shapes[i].type, shapes[i].data);
-        if (area == NULL || perimeter == NULL) {
-            fprintf(stderr, "Error calling multimethod for shape %d\n", i + 1);
-            free(area);
-            free(perimeter);
-            multimethod_cleanup();
-            return 1;
+    for (size_t i = 0; i < num_shapes; i++) {
+        ok &= dispatch("area", shapes[i].type, shapes[i].data, &area);
+        ok &= dispatch("perimeter", shapes[i].type, shapes[i].data, &perim);
+        if (!ok) {
+            fprintf(stderr, "Error calling multimethod for shape %zu\n", i + 1);
+            goto error_cleanup;
         }
-        printf("Shape %d area: %.2f, perimeter: %.2f\n", i + 1, *area, *perimeter);
-        free(area);
-        free(perimeter);
+        printf("Shape %zu area: %.2f, perimeter: %.2f\n", i + 1, area, perim);
     }
 
     multimethod_cleanup();
     return 0;
+
+  error_cleanup:
+    multimethod_cleanup();
+    return 1;
 }
