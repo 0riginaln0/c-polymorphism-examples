@@ -51,6 +51,8 @@ static char* my_strdup(char const * const src) {
 }
 
 static uint32_t hash_djb2(char const * str, uint32_t capacity) {
+    if (src == NULL) return 0;
+
     uint32_t hash = 5381;
     unsigned char const * u_str = (unsigned char const *)str;
     int c;
