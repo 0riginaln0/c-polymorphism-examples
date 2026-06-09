@@ -1,4 +1,4 @@
-// gcc -std=c99 -Wall -Wextra -Wpedantic -pedantic-errors -Werror -Wconversion multi.c -o multi.exe && ./multi.exe
+// gcc -std=c99 -Wall -Wextra -Wpedantic -pedantic-errors -Werror -Wconversion multimethods.c -o multi.exe && ./multi.exe
 /////////////////////////////////////
 // MULTIMETHODS /////////////////////
 /////////////////////////////////////
