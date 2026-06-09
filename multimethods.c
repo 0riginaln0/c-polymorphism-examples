@@ -2,64 +2,31 @@
 // MULTIMETHODS /////////////////////
 /////////////////////////////////////
 
-/*
- * ;; Clojure version
- *
- * (defmulti area :type)
- * (defmulti perimeter :type)
- *
- * (defmethod area :square [{:keys [side]}] (* side side))
- * (defmethod perimeter :square [{:keys [side]}] (* side 4))
- *
- * (defmethod area :rectangle [{:keys [width length]}] (* width length))
- * (defmethod perimeter :rectangle [{:keys [width length]}] (* 2 (+ width length)))
- *
- * (defmethod area :circle [{:keys [radius]}] (* 3.14 radius radius))
- * (defmethod perimeter :circle [{:keys [radius]}] (* 2 3.14 radius))
- *
- * (def square    {:type :square    :side 5.0})
- * (def rectangle {:type :rectangle :width 4.0 :length 6.0})
- * (def circle    {:type :circle    :radius 3.0})
- *
- * (defn -main []
- *   (doseq [shape [square rectangle circle]]
- *     (println (format "Shape area: %.2f, perimeter: %.2f"
- *                      (area shape) (perimeter shape))))
- *
- *   (let [shapes [square rectangle circle]]
- *     (doseq [[idx shape] (map-indexed vector shapes)]
- *       (println (format "Shape %d area: %.2f, perimeter: %.2f"
- *                        (inc idx) (area shape) (perimeter shape))))))
- *
- * (-main)
- */
-
 // #ifndef MULTIMETHODS_H
 // #define MULTIMETHODS_H
 
 #include <stdlib.h>
 #include <string.h>
+#include <stddef.h>
 
-// Function pointer type for method implementations.
-// Takes a void* argument that can be cast to a user‑defined struct.
+static char* my_strdup(const char* src) {
+    if (src == NULL) return NULL;
+    size_t len = strlen(src) + 1;
+    char* dst = (char*)malloc(len);
+    if (dst) {
+        memcpy(dst, src, len);
+    }
+    return dst;
+}
+
 typedef void* (*Multimethod_Fn)(void*);
 
-// Create a new multimethod with the given name.
-// Returns 0 on success, -1 if a multimethod with that name already exists or on allocation error.
 int create_multimethod(const char* name);
 
-// Add a method to an existing multimethod.
-// dispatch_value: string key used for dispatch (e.g. "square", "circle").
-// fn: function pointer to the method implementation.
-// Returns 0 on success, -1 if the multimethod doesn't exist or the key already exists.
 int add_method(const char* multimethod_name, const char* dispatch_value, Multimethod_Fn fn);
 
-// Call the multimethod: lookup the function for the given dispatch_value,
-// and invoke it with the provided argument.
-// Returns whatever the method returns (void*). Returns NULL if multimethod or dispatch_value is not found.
 void* call_multimethod(const char* multimethod_name, const char* dispatch_value, void* arg);
 
-// Clean up all allocated memory.
 void multimethod_cleanup(void);
 
 typedef struct Method_Entry {
@@ -101,6 +68,10 @@ static Method_Entry* find_method(Multimethod* mm, const char* dispatch_value) {
 }
 
 int create_multimethod(const char* name) {
+    if (name == NULL) {
+        return -1;
+    }
+    
     if (find_multimethod(name) != NULL) {
         return -1;
     }
@@ -110,7 +81,7 @@ int create_multimethod(const char* name) {
         return -1;
     }
 
-    new_mm->name = strdup(name);
+    new_mm->name = my_strdup(name);
     if (new_mm->name == NULL) {
         free(new_mm);
         return -1;
@@ -124,6 +95,10 @@ int create_multimethod(const char* name) {
 }
 
 int add_method(const char* multimethod_name, const char* dispatch_value, Multimethod_Fn fn) {
+    if (multimethod_name == NULL || dispatch_value == NULL) {
+        return -1;
+    }
+
     Multimethod* mm = find_multimethod(multimethod_name);
     if (mm == NULL) {
         return -1;
@@ -138,7 +113,7 @@ int add_method(const char* multimethod_name, const char* dispatch_value, Multime
         return -1;
     }
 
-    new_entry->dispatch_value = strdup(dispatch_value);
+    new_entry->dispatch_value = my_strdup(dispatch_value);
     if (new_entry->dispatch_value == NULL) {
         free(new_entry);
         return -1;
@@ -152,6 +127,10 @@ int add_method(const char* multimethod_name, const char* dispatch_value, Multime
 }
 
 void* call_multimethod(const char* multimethod_name, const char* dispatch_value, void* arg) {
+    if (multimethod_name == NULL || dispatch_value == NULL) {
+        return NULL;
+    }
+
     Multimethod* mm = find_multimethod(multimethod_name);
     if (mm == NULL) {
         return NULL;
@@ -197,71 +176,111 @@ typedef struct { double radius; } Circle;
 
 void* square_area(void* args) {
     Square* s = (Square*)args;
-    double* result = malloc(sizeof(double));
+    double* result = (double*)malloc(sizeof(double));
+    if (result == NULL) return NULL;
     *result = s->side * s->side;
     return result;
 }
+
 void* square_perimeter(void* args) {
     Square* s = (Square*)args;
-    double* result = malloc(sizeof(double));
+    double* result = (double*)malloc(sizeof(double));
+    if (result == NULL) return NULL;
     *result = s->side * 4;
     return result;
 }
+
 void* rectangle_area(void* args) {
     Rectangle* r = (Rectangle*)args;
-    double* result = malloc(sizeof(double));
+    double* result = (double*)malloc(sizeof(double));
+    if (result == NULL) return NULL;
     *result = r->width * r->length;
     return result;
 }
+
 void* rectangle_perimeter(void* args) {
     Rectangle* r = (Rectangle*)args;
-    double* result = malloc(sizeof(double));
+    double* result = (double*)malloc(sizeof(double));
+    if (result == NULL) return NULL;
     *result = 2 * (r->width + r->length);
     return result;
 }
+
 void* circle_area(void* args) {
     Circle* c = (Circle*)args;
-    double* result = malloc(sizeof(double));
+    double* result = (double*)malloc(sizeof(double));
+    if (result == NULL) return NULL;
     *result = 3.14 * c->radius * c->radius;
     return result;
 }
+
 void* circle_perimeter(void* args) {
     Circle* c = (Circle*)args;
-    double* result = malloc(sizeof(double));
+    double* result = (double*)malloc(sizeof(double));
+    if (result == NULL) return NULL;
     *result = 2 * 3.14 * c->radius;
     return result;
 }
 
 int main(void) {
-    create_multimethod("area");
-    create_multimethod("perimeter");
+    if (create_multimethod("area") != 0) {
+        fprintf(stderr, "Failed to create multimethod 'area'\n");
+        return 1;
+    }
+    if (create_multimethod("perimeter") != 0) {
+        fprintf(stderr, "Failed to create multimethod 'perimeter'\n");
+        multimethod_cleanup();
+        return 1;
+    }
 
-    add_method("area",      "square",    square_area);
-    add_method("perimeter", "square",    square_perimeter);
-    add_method("area",      "rectangle", rectangle_area);
-    add_method("perimeter", "rectangle", rectangle_perimeter);
-    add_method("area",      "circle",    circle_area);
-    add_method("perimeter", "circle",    circle_perimeter);
+    if (add_method("area",      "square",    square_area) != 0 ||
+        add_method("perimeter", "square",    square_perimeter) != 0 ||
+        add_method("area",      "rectangle", rectangle_area) != 0 ||
+        add_method("perimeter", "rectangle", rectangle_perimeter) != 0 ||
+        add_method("area",      "circle",    circle_area) != 0 ||
+        add_method("perimeter", "circle",    circle_perimeter) != 0) {
+        fprintf(stderr, "Failed to add one or more methods\n");
+        multimethod_cleanup();
+        return 1;
+    }
 
     Square sq = {.side = 5.0};
     Rectangle rc = {.width = 4.0, .length = 6.0};
     Circle ci = {.radius = 3.0};
-
+    
     double* area_sq = (double*)call_multimethod("area", "square", &sq);
     double* perim_sq = (double*)call_multimethod("perimeter", "square", &sq);
+    if (area_sq == NULL || perim_sq == NULL) {
+        fprintf(stderr, "Error calling multimethod for square\n");
+        free(area_sq); free(perim_sq);
+        multimethod_cleanup();
+        return 1;
+    }
     printf("Square area: %.2f, perimeter: %.2f\n", *area_sq, *perim_sq);
     free(area_sq); free(perim_sq);
 
     double* area_rc = (double*)call_multimethod("area", "rectangle", &rc);
     double* perim_rc = (double*)call_multimethod("perimeter", "rectangle", &rc);
+    if (area_rc == NULL || perim_rc == NULL) {
+        fprintf(stderr, "Error calling multimethod for rectangle\n");
+        free(area_rc); free(perim_rc);
+        multimethod_cleanup();
+        return 1;
+    }
     printf("Rectangle area: %.2f, perimeter: %.2f\n", *area_rc, *perim_rc);
     free(area_rc); free(perim_rc);
 
     double* area_ci = (double*)call_multimethod("area", "circle", &ci);
     double* perim_ci = (double*)call_multimethod("perimeter", "circle", &ci);
+    if (area_ci == NULL || perim_ci == NULL) {
+        fprintf(stderr, "Error calling multimethod for circle\n");
+        free(area_ci); free(perim_ci);
+        multimethod_cleanup();
+        return 1;
+    }
     printf("Circle area: %.2f, perimeter: %.2f\n", *area_ci, *perim_ci);
     free(area_ci); free(perim_ci);
-
+    
     struct { const char* type; void* data; } shapes[] = {
         {"square", &sq},
         {"rectangle", &rc},
@@ -272,6 +291,13 @@ int main(void) {
     for (int i = 0; i < num_shapes; i++) {
         double* area = (double*)call_multimethod("area", shapes[i].type, shapes[i].data);
         double* perimeter = (double*)call_multimethod("perimeter", shapes[i].type, shapes[i].data);
+        if (area == NULL || perimeter == NULL) {
+            fprintf(stderr, "Error calling multimethod for shape %d\n", i + 1);
+            free(area);
+            free(perimeter);
+            multimethod_cleanup();
+            return 1;
+        }
         printf("Shape %d area: %.2f, perimeter: %.2f\n", i + 1, *area, *perimeter);
         free(area);
         free(perimeter);
